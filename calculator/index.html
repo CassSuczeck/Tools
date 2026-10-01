@@ -624,7 +624,9 @@
   });
 
   // ---- Manual entry ----
-  var autoElectric = false; // Fully electric was picked for them because the model is an EV
+  var autoElectric = false; // Fully electric was picked for them because the make or model is an EV
+  var userType = 'car';      // the Type they chose themselves; restored when a filled-in Type no longer applies
+  var autoType = false;      // Type was filled in from a known model
   function enteredYear() {
     var y = parseInt(yearInput.value, 10);
     return (y >= 1980 && y <= CURRENT_YEAR + 1) ? y : null;
@@ -644,21 +646,26 @@
     var listMake = listMakeFor(makeInput.value);
     var m = findModel(listMake, modelInput.value);
     var year = enteredYear();
+    var makeKey = resolveMake(makeInput.value);
     var note = '';
+    var isEv = false;
     if (m) {
-      vtypeSelect.value = TYPE_OF[m.type];
+      vtypeSelect.value = TYPE_OF[m.type]; autoType = true;
       var evFrom = EV_FROM_YEAR[(resolveMake(listMake) + '|' + normalizeMake(m.name))];
-      var isEv = (m.type === 'E' || m.type === 'S') && !(evFrom && year && year < evFrom);
-      if (isEv && radioValue('st-fuel') === 'gas') {
-        setRadio('st-fuel', 'ev'); autoElectric = true;
+      isEv = (m.type === 'E' || m.type === 'S') && !(evFrom && year && year < evFrom);
+      if (isEv && (radioValue('st-fuel') === 'gas' || autoElectric)) {
         note = 'The ' + m.name + ' is electric, so we picked "Fully electric". Change it if yours runs on gas.';
-      } else if (!isEv && autoElectric) {
-        setRadio('st-fuel', 'gas'); autoElectric = false;
       }
       if (year && !soldIn(m.years, year)) {
         note = "We don't have a " + year + ' ' + listMake + ' ' + m.name + ' on record in the US. Check the year; you can still send your request.';
       }
-    } else if (autoElectric) {
+    } else if (autoType) {
+      vtypeSelect.value = userType; autoType = false;
+    }
+    if (makeKey && EV_ONLY_MAKES[makeKey]) isEv = true;
+    if (isEv && radioValue('st-fuel') === 'gas') {
+      setRadio('st-fuel', 'ev'); autoElectric = true;
+    } else if (!isEv && autoElectric) {
       setRadio('st-fuel', 'gas'); autoElectric = false;
     }
     modelNote.textContent = note;
@@ -679,7 +686,7 @@
   yearInput.addEventListener('input', function () { refreshModelList(); applyKnownModel(); updateFromManual(); });
   makeInput.addEventListener('input', function () { refreshModelList(); applyKnownModel(); updateFromManual(); });
   modelInput.addEventListener('input', function () { applyKnownModel(); updateFromManual(); });
-  vtypeSelect.addEventListener('change', updateFromManual);
+  vtypeSelect.addEventListener('change', function () { userType = vtypeSelect.value; autoType = false; updateFromManual(); });
   document.querySelectorAll('input[name="st-fuel"]').forEach(function (r) {
     r.addEventListener('change', function () { autoElectric = false; show(modelNote, false); updateFromManual(); });
   });
@@ -786,9 +793,15 @@
     if (firstBad) { $(firstBad).focus(); return; }
 
     var v = currentVehicle();
-    var vehicleDesc = (v && (v.year || v.make))
-      ? [v.year, v.make, v.model].filter(Boolean).join(' ')
-      : 'not provided';
+    var vehicleDesc = 'not provided';
+    if (v && (v.year || v.make)) {
+      // Use the list's spelling when we recognize what was typed ("chevy silverado" -> "Chevrolet Silverado 1500").
+      // Only when the whole entry is the make (or an alias), so "Toyota Camry" typed as a make is kept as typed.
+      var n = normalizeMake(v.make);
+      var listMake = mode === 'manual' && makeByKey[MAKE_ALIASES[n] || n] ? makeByKey[MAKE_ALIASES[n] || n] : null;
+      var known = listMake ? findModel(listMake, v.model) : null;
+      vehicleDesc = [v.year, listMake || v.make, known ? known.name : v.model].filter(Boolean).join(' ');
+    }
 
     bookBtn.disabled = true;
     bookBtn.textContent = 'Sending…';
