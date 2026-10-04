@@ -275,6 +275,9 @@
 <script>
 (function () {
   var RATE = 159.99;
+  // Labor (diagnostics included) is never quoted below one hour (Feather, 2026-10-04). Flat-fee jobs
+  // (oil change from $80, sun visor) are the exception.
+  var MIN_LABOR = 159.99;
   var CURRENT_YEAR = new Date().getFullYear();
   var MAX_MULTIPLIER = 1.6;
   // Tier 5 (Maserati) gets a higher cap, so an older Ghibli isn't flattened to the same price as an older Audi.
@@ -292,7 +295,7 @@
     brakejob:   { label: "Full brake job (pads + rotors, all 4 wheels)", hoursLow: 2.5, hoursHigh: 3.5, partsLow: 300, partsHigh: 650, shop: false },
     cel:        { label: "Check engine light diagnostic", hoursLow: 0.5, hoursHigh: 1,   shop: false },
     nostart:    { label: "No-start diagnostic", hoursLow: 0.5, hoursHigh: 1.5, shop: false },
-    oil:        { label: "Oil change / fluid service", flat: 80, startsAt: true, shop: true },
+    oil:        { label: "Oil change / fluid service", flat: 80, startsAt: true, plusParts: true, shop: true },
     battery:    { label: "Battery replacement", hoursLow: 0.5, hoursHigh: 1, partsLow: 120, partsHigh: 300, shop: false },
     alternator: { label: "Alternator replacement", hoursLow: 1.5, hoursHigh: 2.5, partsLow: 300, partsHigh: 800, shop: false },
     charging:   { label: "Battery/charging system test", hoursLow: 0.5, hoursHigh: 1, shop: false },
@@ -591,7 +594,7 @@
     show(partsNoteEl, !!d.partsHigh);
 
     if (d.flat) {
-      priceEl.textContent = (d.startsAt ? 'Starts at ' : '') + money(d.flat);
+      priceEl.textContent = (d.startsAt ? 'Starts at ' : '') + money(d.flat) + (d.plusParts ? ' plus parts' : '');
       show(vehicleNoteEl, false);
       announce('Estimate for ' + d.label + ': ' + priceEl.textContent);
       return;
@@ -608,9 +611,9 @@
       multiplier = Math.min(multiplier, BRAND_TIER[makeKey] === 5 ? SPECIALTY_MAX_MULTIPLIER : MAX_MULTIPLIER);
     }
 
-    var low = Math.round(RATE * d.hoursLow * multiplier + (d.partsLow || 0));
-    var high = Math.round(RATE * d.hoursHigh * multiplier + (d.partsHigh || 0));
-    priceEl.textContent = money(low) + ' - ' + money(high);
+    var low = Math.round(Math.max(RATE * d.hoursLow * multiplier, MIN_LABOR) + (d.partsLow || 0));
+    var high = Math.round(Math.max(RATE * d.hoursHigh * multiplier, MIN_LABOR) + (d.partsHigh || 0));
+    priceEl.textContent = low === high ? money(low) : money(low) + ' - ' + money(high);
 
     var note = '';
     if (unknownMake) {
@@ -623,7 +626,7 @@
     if (makeKey && !DOMESTIC_MAKES[makeKey]) note = (note ? note + ' ' : '') + IMPORT_NOTE;
     vehicleNoteEl.textContent = note;
     show(vehicleNoteEl, !!note);
-    announce('Estimate for ' + d.label + ': ' + money(low) + ' to ' + money(high) + '.');
+    announce('Estimate for ' + d.label + ': ' + priceEl.textContent.replace(' - ', ' to ') + '.');
   }
   sel.addEventListener('change', render);
 
