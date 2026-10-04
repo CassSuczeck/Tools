@@ -277,6 +277,8 @@
   var RATE = 159.99;
   var CURRENT_YEAR = new Date().getFullYear();
   var MAX_MULTIPLIER = 1.6;
+  // Tier 5 (Maserati) gets a higher cap, so an older Ghibli isn't flattened to the same price as an older Audi.
+  var SPECIALTY_MAX_MULTIPLIER = 2.0;
   var PHONE_LINK = '<a href="tel:+19089863415">(908) 986-3415</a>';
 
   // Google Apps Script Web App (lead receiver v3.3+). No secret here: this page is public.
@@ -319,9 +321,18 @@
     jaguar:3, porsche:3, mini:3, alfaromeo:3, fiat:3, saab:3, smart:3,
     // Tier 4 — exotics: no quote, referred to a specialty shop
     ferrari:4, lamborghini:4, bentley:4, rollsroyce:4, astonmartin:4,
-    bugatti:4, mclaren:4, lotus:4, maserati:4
+    bugatti:4, mclaren:4, lotus:4,
+    // Tier 5 — specialty we do service (1.5x, capped at SPECIALTY_MAX_MULTIPLIER). Feather, 2026-10-04:
+    // she works on Maseratis such as the Ghibli, and older ones take noticeably more time.
+    maserati:5
   };
-  var BRAND_MULTIPLIER = { 1: 1.0, 2: 1.15, 3: 1.3 };
+  var BRAND_MULTIPLIER = { 1: 1.0, 2: 1.15, 3: 1.3, 5: 1.5 };
+  // American makes. Every other make in BRAND_TIER is an import and gets IMPORT_NOTE (Feather, 2026-10-04).
+  var DOMESTIC_MAKES = {
+    ford:1, chevrolet:1, dodge:1, jeep:1, chrysler:1, gmc:1, buick:1, ram:1, cadillac:1, lincoln:1,
+    pontiac:1, saturn:1, mercury:1, oldsmobile:1, plymouth:1, hummer:1
+  };
+  var IMPORT_NOTE = "Work on this make varies a lot, so we'll confirm the price after a look.";
 
   // Makes that only build EVs (or electric-drive vehicles, like Scout's range extenders).
   // We don't service EVs, so these are always referred out. Reviewed quarterly; last review 2026-09-25.
@@ -589,7 +600,7 @@
     if (haveVehicle) {
       var brandMult = makeKey ? BRAND_MULTIPLIER[BRAND_TIER[makeKey]] : 1.0;
       multiplier = ageMultiplier(v.year) * SIZE_MULTIPLIER[v.vtype || 'car'] * brandMult;
-      multiplier = Math.min(multiplier, MAX_MULTIPLIER);
+      multiplier = Math.min(multiplier, BRAND_TIER[makeKey] === 5 ? SPECIALTY_MAX_MULTIPLIER : MAX_MULTIPLIER);
     }
 
     var low = Math.round(RATE * d.hoursLow * multiplier + (d.partsLow || 0));
@@ -604,6 +615,7 @@
     } else if (!haveVehicle) {
       note = 'Add your vehicle above for a more precise estimate.';
     }
+    if (makeKey && !DOMESTIC_MAKES[makeKey]) note = (note ? note + ' ' : '') + IMPORT_NOTE;
     vehicleNoteEl.textContent = note;
     show(vehicleNoteEl, !!note);
     announce('Estimate for ' + d.label + ': ' + money(low) + ' to ' + money(high) + '.');
