@@ -388,7 +388,7 @@
     "Lexus": "CT:c:2011-2017,IS:c:2001-now,RC:c:2015-2025,ES:c:1990-now,GS:c:1993-2020,LS:c:1990-now,LC:c:2018-now,UX:s:2019-now,NX:s:2015-now,RX:s:1999-now,GX:s:2003-now,TX:s:2024-now,LX:s:1996-now,RZ:S:2023-now",
     "Lincoln": "MKZ:c:2007-2020,Continental:c:1990-2002|2017-2020,Town Car:c:1990-2011,MKC:s:2015-2019,Corsair:s:2020-now,MKX:s:2007-2018,Nautilus:s:2019-now,MKT:s:2010-2019,Aviator:s:2003-2005|2020-now,Navigator:s:1998-now",
     "Lucid": "Air:E:2022-now,Gravity:S:2025-now",
-    "Maserati": "Ghibli:c:2014-2024,Quattroporte:c:2005-2024,Levante:s:2017-2024,Grecale:s:2023-now",
+    "Maserati": "Ghibli:c:2014-2024,Quattroporte:c:2005-2024,Levante:s:2017-2024,Grecale:s:2023-now,Grecale Folgore:S:2025-now,GranTurismo Folgore:E:2024-now,MC20:c,MCPura:c",
     "Mazda": "Mazda3:c:2004-now,Mazda6:c:2003-2021,MX-5 Miata:c:1990-now,RX-8:c:2004-2011,CX-3:s:2016-2021,CX-30:s:2020-now,CX-5:s:2013-now,CX-50:s:2023-now,CX-7:s:2007-2012,CX-9:s:2007-2023,CX-70:s:2025-now,CX-90:s:2024-now,MX-30:E:2022-2023",
     "McLaren": "570S:c:2016-2021,GT:c:2020-2023,720S:c:2018-2023,750S:c:2024-now,Artura:c:2023-now",
     "Mercedes-Benz": "A-Class:c:2019-2022,CLA:c:2014-now,C-Class:c:1994-now,E-Class:c:1990-now,CLS:c:2006-2023,S-Class:c:1990-now,SL:c:1990-now,AMG GT:c:2016-now,GLA:s:2015-now,GLB:s:2020-now,GLK:s:2010-2015,GLC:s:2016-now,M-Class / ML:s:1998-2015,GLE:s:2016-now,GL:s:2007-2016,GLS:s:2017-now,G-Class:s:2002-now,EQB:S:2022-2025,EQE:E:2023-now,EQS:E:2022-now,Metris:v:2016-2023,Sprinter:v:2010-now",
@@ -420,6 +420,9 @@
     'Lordstown', 'Lotus', 'Mullen', 'Oldsmobile', 'Plymouth', 'Scout', 'Slate'];
   // A model name reused for a gas car in earlier years: electric only from this year on.
   var EV_FROM_YEAR = { 'acura|zdx': 2024 };
+  // Models of a make we quote that still go to a specialty shop ("make|model" prefix, normalized).
+  // Maserati's supercars (Feather, 2026-10-04). "mc20" also catches the MC20 Cielo.
+  var SPECIALTY_MODELS = ['maserati|mc20', 'maserati|mcpura'];
 
   var REFERRAL_HTML = {
     ev: "We don't service electric vehicles, so we can't quote this one. Call us at " +
@@ -453,6 +456,8 @@
     var key = resolveMake(v.make);
     if (v.electric || (key && EV_ONLY_MAKES[key])) return 'ev';
     if (key && BRAND_TIER[key] === 4) return 'exotic';
+    var km = key + '|' + normalizeMake(v.model);
+    if (key && v.model && SPECIALTY_MODELS.some(function (p) { return km.indexOf(p) === 0; })) return 'exotic';
     return null;
   }
 
