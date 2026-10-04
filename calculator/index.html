@@ -423,6 +423,9 @@
     'Lordstown', 'Lotus', 'Mullen', 'Oldsmobile', 'Plymouth', 'Scout', 'Slate'];
   // A model name reused for a gas car in earlier years: electric only from this year on.
   var EV_FROM_YEAR = { 'acura|zdx': 2024 };
+  // OBD-II became standard on US cars and light trucks in model year 1996. Older vehicles go to a
+  // specialty shop (Feather, 2026-10-04).
+  var OBD2_FROM_YEAR = 1996;
   // Models of a make we quote that still go to a specialty shop ("make|model" prefix, normalized).
   // Maserati's supercars (Feather, 2026-10-04). "mc20" also catches the MC20 Cielo.
   var SPECIALTY_MODELS = ['maserati|mc20', 'maserati|mcpura'];
@@ -431,6 +434,8 @@
     ev: "We don't service electric vehicles, so we can't quote this one. Call us at " +
         PHONE_LINK + " and we'll point you to a shop that does.",
     exotic: "This vehicle needs a specialty shop, so we can't quote it here. Call us at " +
+        PHONE_LINK + " and we'll refer you to one.",
+    classic: "Vehicles built before 1996 need a specialty shop, so we can't quote this one here. Call us at " +
         PHONE_LINK + " and we'll refer you to one."
   };
 
@@ -453,7 +458,7 @@
     return best ? (MAKE_ALIASES[best] || best) : null;
   }
 
-  // 'ev', 'exotic', or null (we can quote it)
+  // 'ev', 'exotic', 'classic', or null (we can quote it)
   function referralFor(v) {
     if (!v) return null;
     var key = resolveMake(v.make);
@@ -461,6 +466,7 @@
     if (key && BRAND_TIER[key] === 4) return 'exotic';
     var km = key + '|' + normalizeMake(v.model);
     if (key && v.model && SPECIALTY_MODELS.some(function (p) { return km.indexOf(p) === 0; })) return 'exotic';
+    if (v.year && v.year < OBD2_FROM_YEAR) return 'classic';
     return null;
   }
 
