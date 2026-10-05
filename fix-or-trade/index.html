@@ -594,7 +594,7 @@
 
       <div class="field">
         <label for="platevin">VIN or plate <span style="font-weight:500;color:var(--text-muted);">(optional, not used in the estimate)</span></label>
-        <input type="text" id="platevin" placeholder="Helps us if you send us your results">
+        <input type="text" id="platevin" placeholder="Optional">
       </div>
 
       <p class="error-msg" id="err0" role="alert">Enter a model year and mileage to continue.</p>
@@ -655,7 +655,7 @@
       <p class="step-label">Step 3 of 5</p>
       <h2 class="step-title" tabindex="-1">What's it need right now?</h2>
 
-      <a class="cta-link" href="https://www.besafetravels.com/calculator" target="_blank" rel="noopener">
+      <a class="cta-link" href="https://tools.besafetravels.com/calculator/" target="_blank" rel="noopener">
         <span>Get a free repair quote from Safe Travels</span>
         <span class="arrow" aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span>
       </a>
@@ -670,6 +670,7 @@
         <input type="number" id="repairCost" inputmode="numeric" placeholder="e.g. 1800" min="0">
         <p class="hint">Use the quote from the link above, or your mechanic's estimate.</p>
       </div>
+      <p class="error-msg" id="err2" role="alert">Enter the repair quote, or tick "No known repairs".</p>
 
       <div class="nav-buttons">
         <button class="ghost" id="back2">Back</button>
@@ -1169,6 +1170,7 @@
     if(makeSel.selectedIndex < 0) makeSel.selectedIndex = 0;
   }
   refreshMakes();
+  addOpt(categorySel, '', 'Choose the closest category');
   Object.keys(SEGMENTS).forEach(function(k){ addOpt(categorySel, k, SEGMENTS[k].label); });
 
   function refreshModels(){
@@ -1220,13 +1222,21 @@
     $('year').setAttribute('aria-invalid', badYear ? 'true' : 'false');
     $('mileage').setAttribute('aria-invalid', badMiles ? 'true' : 'false');
     if(badYear || badMiles){
-      err.textContent = 'Enter a model year and mileage to continue.';
+      err.textContent = badYear ? 'Enter a model year from 1990 to ' + MAX_YEAR + '.' : 'Enter the mileage to continue.';
       err.style.display='block';
       $(badYear ? 'year' : 'mileage').focus();
       return;
     }
     // Nothing is pre-selected, so nobody gets an estimate for a car they didn't pick.
     var noMake = !makeSel.value, noModel = makeSel.value !== '__other__' && !modelSel.value;
+    var noCategory = makeSel.value === '__other__' && !categorySel.value;
+    categorySel.setAttribute('aria-invalid', noCategory ? 'true' : 'false');
+    if(noCategory){
+      err.textContent = 'Choose the closest category for your car.';
+      err.style.display='block';
+      categorySel.focus();
+      return;
+    }
     makeSel.setAttribute('aria-invalid', noMake ? 'true' : 'false');
     modelSel.setAttribute('aria-invalid', !noMake && noModel ? 'true' : 'false');
     if(noMake || noModel){
@@ -1249,7 +1259,14 @@
   $('back1').addEventListener('click', function(){ showStep(0); });
   $('next1').addEventListener('click', function(){ showStep(2); });
   $('back2').addEventListener('click', function(){ showStep(1); });
-  $('next2').addEventListener('click', function(){ showStep(3); });
+  $('next2').addEventListener('click', function(){
+    var v = $('repairCost').value.trim();
+    var bad = !noRepair.checked && (v === '' || isNaN(parseFloat(v)) || parseFloat(v) < 0);
+    $('repairCost').setAttribute('aria-invalid', bad ? 'true' : 'false');
+    $('err2').style.display = bad ? 'block' : 'none';
+    if(bad){ $('repairCost').focus(); return; }
+    showStep(3);
+  });
   $('back3').addEventListener('click', function(){ showStep(2); });
   // From the result, go back to the last step with every answer kept.
   $('back4').addEventListener('click', function(){ showStep(3); });
@@ -1329,6 +1346,7 @@
     $('warranty').value = 'unsure';
     refreshWarranty();
     noRepair.checked=false;
+    $('err2').style.display='none';
     repairField.style.display='block';
     $('paymentHasTrade').checked=false;
     $('applyTrade').checked=true;
@@ -1338,7 +1356,7 @@
     // Put everything back the way a first visit sees it: the year was cleared, so the make and
     // model lists must be rebuilt (they were still filtered by the old year), the comparison
     // slider goes back to 3 years, and the payment tab is selected again.
-    refreshMakes(); makeSel.value = ''; refreshModels();
+    refreshMakes(); makeSel.value = ''; categorySel.value = ''; refreshModels();
     horizonInput.value = 36; renderHorizon();
     tabPayment.click();
     showStep(0);
@@ -1481,7 +1499,7 @@
     $('statFixSub').textContent = 'repair + upkeep over ' + period + '. You\'d still own your car, worth about ' + money(keepValueLeft) + ' then';
     $('statTradeTotal').textContent = money(tradeTotal);
     $('statTradeSub').textContent = 'over ' + period + ', ' + tradeNote + '. ' + (newPrice>0
-      ? (newEquity>0 ? 'The newer car would be worth about ' + money(newEquity) + ' more than you still owe' : 'You\'d still owe about what the newer car is worth')
+      ? (newEquity>0 ? 'We estimate the newer car would be worth about ' + money(newEquity) + ' more than you still owe' : 'You\'d still owe about what the newer car is worth')
       : 'Nothing counted for the newer car at the end (no price entered)');
 
     var verdictCard = $('verdictCard');
@@ -1544,15 +1562,15 @@
     }
     reasons.push('Keeping the car (repair + about ' + money(maintMonthly) + '/month upkeep) runs about ' + money(fixTotal) + ' over ' + period + '.');
     if(mode==='payment'){
-      reasons.push('Replacing it runs about ' + money(tradeGross) + ' in cash down and payments' + (tradeCredit>0 ? ', minus the ' + money(tradeCredit) + ' you\'d get for your trade-in, for a net ' + money(tradeTotal) : '') + ' over the same period.');
+      reasons.push('Replacing it runs about ' + money(tradeGross) + ' in cash down and payments' + (tradeCredit>0 ? ', minus your trade-in\'s estimated value (' + money(tradeCredit) + '), for a net ' + money(tradeTotal) : '') + ' over the same period.');
     } else {
       reasons.push('Replacing it runs about ' + money(tradeTotal) + ' over the same period (' + money(cashDown) + ' down + ' + money(monthlyPay) + '/month' + (tradeCredit>0 ? ', after your ' + money(tradeCredit) + ' trade-in lowers the loan' : '') + ').');
     }
     reasons.push('At the end, you\'d still own your car, worth about ' + money(keepValueLeft) + '. ' + (newPrice>0
-      ? 'The newer car would be worth about ' + money(newValueLeft) + (loanLeft>0 ? ', with about ' + money(loanLeft) + ' still owed on it' : '') + '.'
+      ? 'We estimate the newer car would be worth about ' + money(newValueLeft) + (loanLeft>0 ? ', with about ' + money(loanLeft) + ' still owed on it' : '') + '.'
       : 'We don\'t count anything for the newer car, because no price was entered (as with a lease).'));
     var ahead = Math.abs(diff);
-    reasons.push('Counting what each car is still worth, ' + (diff>=0 ? 'keeping your car comes out about ' : 'replacing it comes out about ') + money(ahead) + ' ahead over ' + period + '.');
+    reasons.push('Counting what each car is still worth, ' + (diff>=0 ? 'keeping your car comes out roughly ' : 'replacing it comes out roughly ') + money(ahead) + ' ahead over ' + period + '.');
     if(age>=12 && mileage > age*12000*1.3){
       reasons.push('Higher-than-typical mileage for its age adds some reliability risk to factor in.');
     }
@@ -1595,9 +1613,9 @@
 
     // "How we calculated this": built from the same numbers as the result, so it always matches the math.
     var mathTrade = isOther
-      ? 'We start from a typical trade-in value for a ' + SEGMENTS[seg].label.toLowerCase() + ' that is 8 years old (your model isn\'t in our list, so this is a category average)'
-      : 'We start from a typical trade-in value for a ' + makeSel.value + ' ' + modelSel.value + ' that is 8 years old';
-    mathTrade += ', then adjust it for your car\'s age, for its mileage compared with about 12,000 miles a year, and for the condition and rust you reported' +
+      ? 'We start from a typical trade-in value for an 8-year-old ' + SEGMENTS[seg].label.toLowerCase() + ' (our reference age; your model isn\'t in our list, so this is a category average)'
+      : 'We start from a typical trade-in value for an 8-year-old ' + makeSel.value + ' ' + modelSel.value + ' (our reference age)';
+    mathTrade += ', then adjust it for your car\'s actual age (' + age + (age===1 ? ' year' : ' years') + '), for its mileage compared with about 12,000 miles a year, and for the condition and rust you reported' +
       (swIssues.length ? (swCounts ? ', plus the electronics problems (3% off for each)' : ' (the electronics problems don\'t lower it, since you said it\'s under warranty)') : '') +
       '. The range shows how much cars like yours usually vary.';
     var mathKeep = (repairCost>0 ? 'Your repair quote (' + money(repairCost) + ')' : 'No repair quote') +
