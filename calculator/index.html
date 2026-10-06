@@ -109,6 +109,8 @@
   .price{ font-family:Montserrat, Arial, sans-serif; font-weight:900; font-size:32px; line-height:1.2; margin:4px 0; }
   .quote p{ margin:4px 0 0; font-size:15px; }
   .banner{ background:#FFF1D6; color:#5A3B00; border-radius:10px; padding:10px 12px; margin-bottom:12px; font-size:15px; }
+  .trade-link{ background:var(--bluegray); color:var(--navy); border-radius:10px; padding:10px 12px; margin:12px 0 0; font-size:15px; }
+  .trade-link a{ color:var(--navy); font-weight:700; }
   .referral{ background:var(--bluegray); color:var(--navy); border-radius:12px; padding:16px 18px; }
   .legal{ font-size:14px; margin:12px 0 0; }
   .done{ border:2px solid var(--ok); border-radius:12px; padding:14px 16px; color:var(--charcoal); }
@@ -225,6 +227,7 @@
           <p id="st-parts-note" hidden>Includes typical parts. Final parts cost depends on your vehicle.</p>
           <p id="st-vehicle-note" hidden></p>
         </div>
+        <p class="trade-link" id="st-trade-link" hidden>Big repair on an older car? Our free tool compares fixing it with trading it in: <a href="https://tools.besafetravels.com/fix-or-trade/" target="_blank" rel="noopener">Fix it, or trade it in?<span class="sr-only"> (opens in a new tab)</span></a></p>
         <p class="legal">Ballpark estimate for planning purposes. Your official written estimate, as required under New Jersey law, is provided before any work begins. Diagnostic fees are credited toward the repair if you move forward.</p>
       </div>
       <!-- One short announcement per change, so screen readers aren't flooded while typing. -->
@@ -335,6 +338,9 @@
     ford:1, chevrolet:1, dodge:1, jeep:1, chrysler:1, gmc:1, buick:1, ram:1, cadillac:1, lincoln:1,
     pontiac:1, saturn:1, mercury:1, oldsmobile:1, plymouth:1, hummer:1
   };
+  // Show the "Fix it, or trade it in?" link when the car is at least this old and the high end reaches this price.
+  var TRADE_LINK_MIN_AGE = 8;
+  var TRADE_LINK_MIN_PRICE = 1000;
   var IMPORT_NOTE = "Work on this make varies a lot, so we'll confirm the price after a look.";
 
   // Makes that only build EVs (or electric-drive vehicles, like Scout's range extenders).
@@ -546,6 +552,7 @@
   var shopBanner = $('st-shop-banner');
   var vehicleNoteEl = $('st-vehicle-note');
   var partsNoteEl = $('st-parts-note');
+  var tradeLinkEl = $('st-trade-link');
   var announceEl = $('st-announce');
   var bookSection = $('st-book-section');
 
@@ -598,6 +605,7 @@
     }
     serviceEl.textContent = d.label;
     show(shopBanner, d.shop);
+    show(tradeLinkEl, false);
     show(partsNoteEl, !!d.partsHigh);
 
     if (d.flat) {
@@ -621,6 +629,8 @@
     var low = Math.round(Math.max(RATE * d.hoursLow * multiplier, MIN_LABOR) + (d.partsLow || 0));
     var high = Math.round(Math.max(RATE * d.hoursHigh * multiplier, MIN_LABOR) + (d.partsHigh || 0));
     priceEl.textContent = low === high ? money(low) : money(low) + ' - ' + money(high);
+    // F8: a big repair on an older car links to "Fix it, or trade it in?" (same service rules as here).
+    show(tradeLinkEl, !!(v && v.year) && CURRENT_YEAR - v.year >= TRADE_LINK_MIN_AGE && high >= TRADE_LINK_MIN_PRICE);
 
     var note = '';
     if (unknownMake) {
