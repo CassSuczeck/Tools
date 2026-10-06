@@ -209,6 +209,7 @@
     color: var(--text-muted);
     margin-top:5px;
   }
+  .hint.mileage-words{ font-size:14px; font-weight:600; color: var(--text-body); min-height:1.4em; }
   input[type="text"], input[type="number"], select{
     width:100%;
     padding: 12px 14px;
@@ -572,7 +573,8 @@
         </div>
         <div class="field">
           <label for="mileage">Mileage</label>
-          <input type="number" id="mileage" inputmode="numeric" aria-describedby="err0" placeholder="e.g. 82000" min="0">
+          <input type="text" id="mileage" inputmode="numeric" autocomplete="off" aria-describedby="mileageWords err0" placeholder="e.g. 82,000">
+          <p class="hint mileage-words" id="mileageWords"></p>
         </div>
       </div>
 
@@ -1219,15 +1221,45 @@
   var MAX_YEAR = new Date().getFullYear() + 1;
   $('year').max = MAX_YEAR;
 
+  // ---- Mileage: commas as you type, plus the number in words, so 8,200 vs 82,000 vs 820,000 is
+  // hard to miss. Unlikely numbers get one "check this" stop before moving on.
+  var MAX_MILES = 999999; // odometers stop at six digits
+  function milesValue(){ var d = $('mileage').value.replace(/\D/g,''); return d ? parseInt(d,10) : NaN; }
+  function milesInWords(n){
+    if(isNaN(n)) return '';
+    if(n >= 1000000) return 'That\'s ' + (Math.floor(n/10000)/100) + ' million miles';
+    if(n >= 1000) return 'That\'s ' + (Math.round(n/100)/10) + ' thousand miles';
+    return 'That\'s ' + n + (n===1 ? ' mile' : ' miles');
+  }
+  var milesConfirmed = null; // the unlikely mileage the visitor already confirmed
+  function formatMileage(){
+    var el = $('mileage'), pos = el.selectionStart || 0;
+    var digitsBefore = el.value.slice(0, pos).replace(/\D/g,'').length;
+    var digits = el.value.replace(/\D/g,'').replace(/^0+(?=\d)/,'').slice(0,7);
+    el.value = digits ? Number(digits).toLocaleString('en-US') : '';
+    var i = 0, c = 0;
+    while(i < el.value.length && c < digitsBefore){ if(/\d/.test(el.value.charAt(i))) c++; i++; }
+    if(document.activeElement === el) el.setSelectionRange(i, i);
+    $('mileageWords').textContent = milesInWords(milesValue());
+  }
+  $('mileage').addEventListener('input', formatMileage);
+
   $('next0').addEventListener('click', function(){
     var year = parseInt($('year').value,10);
-    var mileage = parseInt($('mileage').value,10);
+    var mileage = milesValue();
     var err = $('err0');
-    var badYear = !year || year<1990 || year>MAX_YEAR, badMiles = isNaN(mileage) || mileage<0;
+    var badYear = !year || year<1990 || year>MAX_YEAR, badMiles = isNaN(mileage) || mileage>MAX_MILES;
+    var age = badYear ? 0 : Math.max(0, new Date().getFullYear() - year);
+    var oddMiles = !badMiles && mileage!==milesConfirmed && ((mileage<1000 && age>=2) || mileage>400000);
     $('year').setAttribute('aria-invalid', badYear ? 'true' : 'false');
-    $('mileage').setAttribute('aria-invalid', badMiles ? 'true' : 'false');
-    if(badYear || badMiles){
-      err.textContent = badYear ? 'Enter a model year from 1990 to ' + MAX_YEAR + '.' : 'Enter the mileage to continue.';
+    $('mileage').setAttribute('aria-invalid', badMiles || oddMiles ? 'true' : 'false');
+    if(badYear || badMiles || oddMiles){
+      err.textContent = badYear ? 'Enter a model year from 1990 to ' + MAX_YEAR + '.'
+        : isNaN(mileage) ? 'Enter the mileage to continue.'
+        : badMiles ? 'That\'s over 1 million miles. Check the number on your odometer.'
+        : 'Please check the mileage: ' + mileage.toLocaleString('en-US') + ' miles is ' + (mileage<1000 ? 'very low' : 'very high')
+          + ' for a ' + year + '. If it\'s right, press Continue again.';
+      if(oddMiles) milesConfirmed = mileage;
       err.style.display='block';
       $(badYear ? 'year' : 'mileage').focus();
       return;
@@ -1345,6 +1377,7 @@
       if(!keep[i.id]) i.value='';
     });
     $('knownDown').value = 0; $('down').value = 0;
+    $('mileageWords').textContent = ''; milesConfirmed = null;
     document.querySelector('input[name=cond][value=good]').checked = true;
     document.querySelector('input[name=rust][value=none]').checked = true;
     swBoxes.forEach(function(b){ b.checked=false; });
@@ -1375,7 +1408,7 @@
 
   function computeAndShow(){
     var year = parseInt($('year').value,10);
-    var mileage = parseInt($('mileage').value,10);
+    var mileage = milesValue();
     var currentYear = new Date().getFullYear();
     var age = Math.max(0, currentYear - year);
 
