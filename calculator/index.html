@@ -151,6 +151,8 @@
           <option value="suspension">Suspension noise (bumps/clunks)</option>
           <option value="belt">Unusual noise (belt/pulley)</option>
           <option value="dashcam">Dash cam install</option>
+          <option value="ppi">Used car I'm thinking of buying (pre-purchase inspection)</option>
+          <option value="mvi">Check-up for my car (multipoint inspection)</option>
           <option value="visor">Sun visor flapping / won't stay up</option>
         </select>
       </div>
@@ -292,6 +294,7 @@
   var SUBMIT_TIMEOUT_MS = 20000;
   var PAGE_OPENED = Date.now();
 
+  var TRIP_NOTE = "Trip fee and mileage may apply for locations more than a 30-minute drive away.";
   var DATA = {
     // partsLow/partsHigh: typical parts cost, added after the vehicle multiplier (which only scales labor hours)
     brakes:     { label: "Brake pads (one axle)", hoursLow: 1, hoursHigh: 1.5, partsLow: 60, partsHigh: 150, shop: false },
@@ -305,7 +308,11 @@
     suspension: { label: "Suspension repair", hoursLow: 1,   hoursHigh: 2,   shop: false },
     belt:       { label: "Belt/pulley noise", hoursLow: 0.5, hoursHigh: 1.5, shop: false },
     dashcam:    { label: "Dash cam install", hoursLow: 0.5, hoursHigh: 1,   shop: false },
-    visor:      { label: "Sun visor repair", flat: 400, shop: false }
+    visor:      { label: "Sun visor repair", flat: 400, shop: false },
+    // Inspections: flat prices set by Feather 2026-10-06, an exception to MIN_LABOR.
+    // Trip fee and mileage only beyond a 30-minute drive, at Feather's decision.
+    ppi:        { label: "Pre-purchase inspection", flat: 59.99, shop: false, note: TRIP_NOTE },
+    mvi:        { label: "Multipoint vehicle inspection", flat: 99.99, shop: false, note: TRIP_NOTE }
   };
 
   // ---- Proprietary vehicle complexity multipliers (Safe Travels' own judgment,
@@ -610,8 +617,9 @@
 
     if (d.flat) {
       priceEl.textContent = (d.startsAt ? 'Starts at ' : '') + money(d.flat) + (d.plusParts ? ' plus parts' : '');
-      show(vehicleNoteEl, false);
-      announce('Estimate for ' + d.label + ': ' + priceEl.textContent);
+      vehicleNoteEl.textContent = d.note || '';
+      show(vehicleNoteEl, !!d.note);
+      announce('Estimate for ' + d.label + ': ' + priceEl.textContent + (d.note ? '. ' + d.note : ''));
       return;
     }
 
