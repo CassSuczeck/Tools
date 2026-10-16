@@ -992,25 +992,30 @@
     "Suzuki": {f:0.55, old:true, m:"SX4:car,Kizashi:mid,Grand Vitara:csuv"}
   };
 
-  // Hand-researched ranges that take priority over the segment model.
+  // Hand-researched ranges that take priority over the segment model: KBB trade-in (low) to
+  // private-party (high), Good condition, from Feather's valuation reference CSV (updated 2026-10-16;
+  // 2018 rows from 2026-09-15). Each row: model year -> [low, high, confidence]. Typical mileage behind
+  // each year: 2016 ~100-120k, 2018 ~70-90k, 2020 ~50-65k, 2022 ~30-45k, 2024 ~10-25k.
+  // The math uses the ANCHOR_YEAR row and the age curve; the other years are reference points for tuning it.
+  var ANCHOR_YEAR = 2018;
   var OVERRIDES = [
-    {make:"Toyota", model:"Camry", low:10500, high:13500, conf:"High"},
-    {make:"Toyota", model:"Corolla", low:8200, high:11200, conf:"High"},
-    {make:"Honda", model:"Civic", low:9300, high:13000, conf:"High"},
-    {make:"Honda", model:"Accord", low:10500, high:13800, conf:"High"},
-    {make:"Hyundai", model:"Elantra", low:3900, high:7300, conf:"Medium"},
-    {make:"Nissan", model:"Sentra", low:2700, high:5300, conf:"Medium"},
-    {make:"BMW", model:"3 Series", low:6600, high:10800, conf:"Medium"},
-    {make:"BMW", model:"X3", low:10900, high:12900, conf:"Medium"},
-    {make:"BMW", model:"X5", low:9400, high:14900, conf:"Low"},
-    {make:"Mercedes-Benz", model:"C-Class", low:9800, high:11700, conf:"Medium"},
-    {make:"Mercedes-Benz", model:"E-Class", low:13000, high:18300, conf:"Low"},
-    {make:"Audi", model:"A4", low:6900, high:10500, conf:"Medium"},
-    {make:"Audi", model:"Q5", low:8700, high:12000, conf:"Medium"},
-    {make:"Volkswagen", model:"Jetta", low:5900, high:7900, conf:"Medium"},
-    {make:"Volkswagen", model:"Tiguan", low:4400, high:7400, conf:"Medium"},
-    {make:"Volvo", model:"XC60", low:9600, high:14000, conf:"Medium"},
-    {make:"Volvo", model:"S60", low:6000, high:17900, conf:"Low"}
+    {make:"Toyota", model:"Camry", years:{2016:[8700,12580,"Medium"], 2018:[10500,13500,"High"], 2020:[12700,18580,"High"], 2022:[15100,21710,"Medium"], 2024:[19340,24560,"High"]}},
+    {make:"Toyota", model:"Corolla", years:{2016:[8420,11550,"Medium"], 2018:[8200,11200,"High"], 2020:[11020,15090,"High"], 2022:[13280,16590,"High"], 2024:[15510,19700,"High"]}},
+    {make:"Honda", model:"Civic", years:{2016:[8905,12560,"Medium"], 2018:[9300,13000,"High"], 2020:[12020,17350,"High"], 2022:[15750,19200,"High"], 2024:[18550,22790,"High"]}},
+    {make:"Honda", model:"Accord", years:{2016:[8845,11560,"Medium"], 2018:[10500,13800,"High"], 2020:[13220,17820,"High"], 2022:[16120,21100,"High"], 2024:[18980,22190,"High"]}},
+    {make:"Hyundai", model:"Elantra", years:{2016:[3620,6945,"Medium"], 2018:[3900,7300,"Medium"], 2020:[6935,10680,"High"], 2022:[10470,14570,"High"], 2024:[13310,16710,"High"]}},
+    {make:"Nissan", model:"Sentra", years:{2016:[2515,6270,"Medium"], 2018:[2700,5300,"Medium"], 2020:[7570,11640,"High"], 2022:[8540,13830,"High"], 2024:[12960,16220,"High"]}},
+    {make:"BMW", model:"3 Series", years:{2016:[6235,11060,"Medium"], 2018:[6600,10800,"Medium"], 2020:[15040,18950,"Medium"], 2022:[20980,24450,"Medium"], 2024:[25930,33640,"Medium"]}},
+    {make:"BMW", model:"X3", years:{2016:[7310,11820,"Medium"], 2018:[10900,12900,"Medium"], 2020:[15230,18920,"Medium"], 2022:[21150,25070,"Medium"], 2024:[24340,33760,"Medium"]}},
+    {make:"BMW", model:"X5", years:{2016:[8105,12490,"Medium"], 2018:[9400,14900,"Low"], 2020:[17430,24440,"Medium"], 2022:[25630,33440,"Medium"], 2024:[37290,46030,"Medium"]}},
+    {make:"Mercedes-Benz", model:"C-Class", years:{2016:[6995,12130,"Medium"], 2018:[9800,11700,"Medium"], 2020:[13910,17780,"Medium"], 2022:[22310,26960,"Medium"], 2024:[26420,34230,"Medium"]}},
+    {make:"Mercedes-Benz", model:"E-Class", years:{2016:[8605,12660,"Medium"], 2018:[13000,18300,"Low"], 2020:[17600,26050,"Medium"], 2022:[25100,31620,"Medium"], 2024:[40060,57240,"Low"]}},
+    {make:"Audi", model:"A4", years:{2016:[6590,11070,"Medium"], 2018:[6900,10500,"Medium"], 2020:[12650,18000,"Medium"], 2022:[15600,22400,"Medium"], 2024:[16150,25000,"Medium"]}},
+    {make:"Audi", model:"Q5", years:{2016:[5500,10900,"Medium"], 2018:[8700,12000,"Medium"], 2020:[13450,16950,"Medium"], 2022:[15350,21500,"Medium"], 2024:[21600,27700,"Medium"]}},
+    {make:"Volkswagen", model:"Jetta", years:{2016:[3425,9075,"Medium"], 2018:[5900,7900,"Medium"], 2020:[8075,13400,"Medium"], 2022:[10250,16100,"Medium"], 2024:[13000,19700,"Medium"]}},
+    {make:"Volkswagen", model:"Tiguan", years:{2016:[3125,7700,"Medium"], 2018:[4400,7400,"Medium"], 2020:[7525,14700,"Medium"], 2022:[10700,19550,"Medium"], 2024:[14650,24600,"Medium"]}},
+    {make:"Volvo", model:"XC60", years:{2016:[4375,11300,"Medium"], 2018:[9600,14000,"Medium"], 2020:[15350,21700,"Medium"], 2022:[17450,26000,"Medium"], 2024:[25200,35300,"Medium"]}},
+    {make:"Volvo", model:"S60", years:{2016:[3425,10100,"Medium"], 2018:[6000,17900,"Low"], 2020:[10650,18250,"Medium"], 2022:[16750,21500,"Medium"], 2024:[20800,29900,"Medium"]}}
   ];
 
   function lookup(make, model){
@@ -1018,7 +1023,7 @@
     var brand = BRANDS[make];
     var entry = brand.m.split(',').map(function(s){ return s.split(':'); }).filter(function(p){ return p[0]===model; })[0];
     var seg = entry[1];
-    if(o) return {low:o.low, high:o.high, conf:o.conf, seg:seg};
+    if(o){ var a = o.years[ANCHOR_YEAR]; return {low:a[0], high:a[1], conf:a[2], seg:seg, years:o.years}; }
     var mid = SEGMENTS[seg].base * brand.f * (entry[2] ? parseFloat(entry[2]) : 1);
     var conf = (brand.old || seg==='exotic' || seg==='ev' || seg==='evsuv') ? 'Low' : 'Medium';
     return {low:mid*0.85, high:mid*1.15, conf:conf, seg:seg};
