@@ -905,7 +905,8 @@
   };
 
   // ---- Reference data ----
-  // Values are estimated trade-in values for an 8-year-old car (2018 model year, priced in 2026).
+  // SEGMENTS/BRANDS values are estimated trade-in values for an 8-year-old car (priced in 2026).
+  // Researched models (OVERRIDES below) have their own values for ages 2–10.
   var ANCHOR_AGE = 8;
 
   var SEGMENTS = {
@@ -996,8 +997,8 @@
   // private-party (high), Good condition, from Feather's valuation reference CSV (updated 2026-10-16;
   // 2018 rows from 2026-09-15). Each row: model year -> [low, high, confidence]. Typical mileage behind
   // each year: 2016 ~100-120k, 2018 ~70-90k, 2020 ~50-65k, 2022 ~30-45k, 2024 ~10-25k.
-  // The math uses the ANCHOR_YEAR row and the age curve; the other years are reference points for tuning it.
-  var ANCHOR_YEAR = 2018;
+  // The tool uses these rows by the car's age (researchedRange below); REF_PRICED_YEAR is when they were priced.
+  var REF_PRICED_YEAR = 2026;
   var OVERRIDES = [
     {make:"Toyota", model:"Camry", years:{2016:[8700,12580,"Medium"], 2018:[10500,13500,"High"], 2020:[12700,18580,"High"], 2022:[15100,21710,"Medium"], 2024:[19340,24560,"High"]}},
     {make:"Toyota", model:"Corolla", years:{2016:[8420,11550,"Medium"], 2018:[8200,11200,"High"], 2020:[11020,15090,"High"], 2022:[13280,16590,"High"], 2024:[15510,19700,"High"]}},
@@ -1023,7 +1024,7 @@
     var brand = BRANDS[make];
     var entry = brand.m.split(',').map(function(s){ return s.split(':'); }).filter(function(p){ return p[0]===model; })[0];
     var seg = entry[1];
-    if(o){ var a = o.years[ANCHOR_YEAR]; return {low:a[0], high:a[1], conf:a[2], seg:seg, years:o.years}; }
+    if(o) return {researched:o, seg:seg};
     var mid = SEGMENTS[seg].base * brand.f * (entry[2] ? parseFloat(entry[2]) : 1);
     var conf = (brand.old || seg==='exotic' || seg==='ev' || seg==='evsuv') ? 'Low' : 'Medium';
     return {low:mid*0.85, high:mid*1.15, conf:conf, seg:seg};
@@ -1045,19 +1046,51 @@
   // % of new value kept by age. After 15 years values keep falling 14% a year (F26, KBB 2026-10:
   // a 1995 Camry trades in for a few hundred dollars). lux: luxury segments of brands that lose value
   // fast (brand factor under 1) lose another 7% a year after 12 years (a 2000 Jaguar XJ8: $100–800).
-  var retention = [100,82,72.5,64.5,58,52.5,47.5,43,39,35.5,32.5,30,27.5,25.5,23.5,22];
+  // F28 (2026-10-16 valuation CSV): a 6-year-old car is worth about 1.47x an 8-year-old one (was 1.22x),
+  // so ages 7+ were lowered (ages 8+ all by the same 0.83, keeping their ratios to each other).
+  var retention = [100,82,72.5,64.5,58,52.5,47.5,39.2,32.3,29.4,26.9,24.9,22.8,21.1,19.5,18.2];
   var OLD_YEARLY = 0.86, LUX_FROM_AGE = 12, LUX_YEARLY = 0.93;
   function retentionAt(age, lux){
     if(age<0) age=0;
     var r = age < retention.length ? retention[age]
       : retention[retention.length-1] * Math.pow(OLD_YEARLY, age - (retention.length-1));
     if(lux && age > LUX_FROM_AGE) r *= Math.pow(LUX_YEARLY, age - LUX_FROM_AGE);
-    return Math.max(1, r);
+    return Math.max(0.83, r); // 0.83: the old 1% floor, rescaled with ages 8+
   }
   // Same curve between whole years (e.g. 7.5 years old).
   function retentionFrac(age, lux){
     var lo = Math.floor(Math.max(0, age)), f = Math.max(0, age) - lo;
     return retentionAt(lo, lux)*(1-f) + retentionAt(lo+1, lux)*f;
+  }
+
+  // Researched rows that count: a row worth more, at either end, than the next newer row is an
+  // outlier and is skipped (Feather, 2026-10-16: some cars are worth more even when older). Oldest first.
+  function usableYears(o){
+    var keep = [];
+    Object.keys(o.years).map(Number).sort(function(a,b){ return b-a; }).forEach(function(y){
+      var v = o.years[y], newer = keep.length ? o.years[keep[keep.length-1]] : null;
+      if(!newer || (v[0] <= newer[0] && v[1] <= newer[1])) keep.push(y);
+    });
+    return keep.reverse();
+  }
+  // Range for a researched model at the given age. Rows are keyed by age when priced (REF_PRICED_YEAR - model
+  // year: 2, 4, 6, 8, 10), so the same age gets the same value in later years, like the old 8-year anchor.
+  // At a researched age: that row. Between two: a straight-line blend (never worth more than a younger car).
+  // Outside them: the nearest row moved along the age curve.
+  function researchedRange(o, age, lux){
+    var ages = usableYears(o).map(function(y){ return REF_PRICED_YEAR - y; }).reverse(); // youngest first
+    var row = function(a){ return o.years[REF_PRICED_YEAR - a]; };
+    var younger = ages.filter(function(a){ return a <= age; }).pop();
+    var older = ages.filter(function(a){ return a >= age; })[0];
+    if(younger === undefined) younger = older;
+    if(older === undefined) older = younger;
+    var w = older === younger ? 0 : (age - younger) / (older - younger);
+    var curve = older === younger ? retentionAt(age, lux) / retentionAt(older, lux) : 1;
+    var val = function(i){ return (row(younger)[i]*(1-w) + row(older)[i]*w) * curve; };
+    var confOrder = ["High","Medium","Low"];
+    var conf = confOrder[Math.max(confOrder.indexOf(row(younger)[2]), confOrder.indexOf(row(older)[2]))];
+    return {low:val(0), high:val(1), conf:conf, minAge:ages[0], maxAge:ages[ages.length-1],
+            younger:younger, older:older, dist:Math.min(Math.abs(age-younger), Math.abs(age-older))};
   }
 
   function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
@@ -1417,7 +1450,7 @@
     var age = Math.max(0, currentYear - year);
 
     // ---- base value ----
-    var low, high, conf, seg, isOther=false, carName;
+    var low, high, conf, seg, isOther=false, carName, researched=null;
     if(makeSel.value === '__other__'){
       isOther = true;
       seg = categorySel.value;
@@ -1425,12 +1458,16 @@
       carName = year + ' ' + SEGMENTS[seg].label.toLowerCase();
     } else {
       var ref = lookup(makeSel.value, modelSel.value);
-      low = ref.low; high = ref.high; conf = ref.conf; seg = ref.seg;
+      low = ref.low; high = ref.high; conf = ref.conf; seg = ref.seg; researched = ref.researched || null;
       carName = year + ' ' + makeSel.value + ' ' + modelSel.value;
     }
 
     var lux = seg.charAt(0)==='l' && (isOther || BRANDS[makeSel.value].f < 1);
-    var scale = retentionAt(age, lux) / retentionAt(ANCHOR_AGE, lux);
+    var scale = retentionAt(age, lux) / retentionAt(ANCHOR_AGE, lux), refDist = Math.abs(age-ANCHOR_AGE);
+    if(researched){
+      researched = researchedRange(researched, age, lux);
+      low = researched.low; high = researched.high; conf = researched.conf; scale = 1; refDist = researched.dist;
+    }
     var expectedMileage = Math.max(1000, age*12000);
     var mileageDiff = (mileage - expectedMileage) / expectedMileage;
     var mileageFactor = 1 - clamp(mileageDiff*0.25, -0.35, 0.35);
@@ -1450,7 +1487,7 @@
 
     var confOrder = ["High","Medium","Low"];
     var confIdx = confOrder.indexOf(conf);
-    if(isOther || Math.abs(age-ANCHOR_AGE)>4 || Math.abs(mileageDiff)>0.5 || rust.pts>0) confIdx = Math.min(2, confIdx+1);
+    if(isOther || refDist>4 || Math.abs(mileageDiff)>0.5 || rust.pts>0) confIdx = Math.min(2, confIdx+1);
     var finalConf = confOrder[confIdx];
 
     // ---- repair ----
@@ -1659,8 +1696,13 @@
     // "How we calculated this": built from the same numbers as the result, so it always matches the math.
     var mathTrade = isOther
       ? 'We start from a typical trade-in value for an 8-year-old ' + SEGMENTS[seg].label.toLowerCase() + ' (our reference age; your model isn\'t in our list, so this is a category average)'
+      : researched
+      ? 'We start from researched trade-in values for the ' + makeSel.value + ' ' + modelSel.value + ' at ' + researched.minAge + ' to ' + researched.maxAge + ' years old' +
+        (researched.dist === 0 ? ', using the values for one that\'s ' + age + ' years old'
+          : researched.older !== researched.younger ? ', estimating your car\'s age (' + age + ' years) from the ' + researched.younger + '- and ' + researched.older + '-year values'
+          : ', moving the closest age (' + researched.older + ' years) along a typical value curve to your car\'s age (' + age + (age===1 ? ' year' : ' years') + ')')
       : 'We start from a typical trade-in value for an 8-year-old ' + makeSel.value + ' ' + modelSel.value + ' (our reference age)';
-    mathTrade += ', then adjust it for your car\'s actual age (' + age + (age===1 ? ' year' : ' years') + '), for its mileage compared with about 12,000 miles a year, and for the condition and rust you reported' +
+    mathTrade += (researched ? ', then adjust it' : ', then adjust it for your car\'s actual age (' + age + (age===1 ? ' year' : ' years') + '),') + ' for its mileage compared with about 12,000 miles a year, and for the condition and rust you reported' +
       (swIssues.length ? (swCounts ? ', plus the electronics problems (3% off for each)' : ' (the electronics problems don\'t lower it, since you said it\'s under warranty)') : '') +
       '. The range shows how much cars like yours usually vary.';
     var mathKeep = (repairCost>0 ? 'Your repair quote (' + money(repairCost) + ')' : 'No repair quote') +
