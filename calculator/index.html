@@ -804,6 +804,28 @@
       });
   });
 
+  // ---- Links that pick the problem (and optionally the car) for the visitor ----
+  // e.g. ?problem=cel&year=2011&make=Nissan&model=Pathfinder. Unknown or bad values are
+  // ignored and the page opens as usual. A make we don't recognize is dropped, and the
+  // model with it, so a link can't put arbitrary text in the vehicle note.
+  function applyLinkParams() {
+    var params;
+    try { params = new URLSearchParams(window.location.search); } catch (e) { return; }
+    var problem = (params.get('problem') || '').trim().toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(DATA, problem)) sel.value = problem;
+
+    var year = parseInt(params.get('year'), 10);
+    var make = (params.get('make') || '').trim().slice(0, 40);
+    var model = (params.get('model') || '').trim().slice(0, 60);
+    if (!resolveMake(make)) { make = ''; model = ''; }
+    var filled = false;
+    if (year >= 1980 && year <= CURRENT_YEAR + 1) { yearInput.value = String(year); filled = true; }
+    if (make) { makeInput.value = make; filled = true; }
+    if (model) modelInput.value = model;
+    if (filled) { refreshModelList(); applyKnownModel(); updateFromManual(); }
+  }
+  applyLinkParams();
+
   render();
 
   // ---- Lead form ----
