@@ -282,7 +282,7 @@
 (function () {
   var RATE = 159.99;
   // Labor (diagnostics included) is never quoted below one hour (Feather, 2026-10-04). Flat-fee jobs
-  // (oil change from $80, sun visor) are the exception.
+  // (oil change from $80, inspections) are the exception.
   var MIN_LABOR = 159.99;
   var CURRENT_YEAR = new Date().getFullYear();
   var MAX_MULTIPLIER = 1.6;
@@ -309,7 +309,8 @@
     suspension: { label: "Suspension repair", hoursLow: 1,   hoursHigh: 2,   shop: false },
     belt:       { label: "Belt/pulley noise", hoursLow: 0.5, hoursHigh: 1.5, shop: false },
     dashcam:    { label: "Dash cam install", hoursLow: 0.5, hoursHigh: 1,   shop: false },
-    visor:      { label: "Sun visor repair", flat: 400, shop: false },
+    // Sun visor: about $160 to $500 with the part (Feather, 2026-10-16); was a flat $400 by mistake.
+    visor:      { label: "Sun visor repair", hoursLow: 0.5, hoursHigh: 1, partsLow: 0, partsHigh: 340, shop: false },
     // Inspections: flat prices set by Feather 2026-10-06, an exception to MIN_LABOR.
     // Trip fee and mileage only beyond a 30-minute drive, at Feather's decision.
     ppi:        { label: "Pre-purchase inspection", flat: 59.99, shop: false, note: TRIP_NOTE },
